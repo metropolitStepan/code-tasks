@@ -48,10 +48,41 @@ class ConveyorSchedule(AbstractSchedule):
         # исполнителя объектами ScheduleItem.
         self.__fill_schedule(ConveyorSchedule.__sort_tasks(tasks))
 
+    def add_task(self, task: StagedTask) -> None:
+        """Добавляет задачу в расписание и формирует после добавления оптимальное расписание"""
+        self.__validate_task(task)
+        self._tasks.append(task)
+        self.recalculate_scheduler()
+
+    def remove_task(self, task_name: str) -> bool:
+        """Удаляет задачу по имени и пересчитывает расписание.
+
+         :return : True если задача была удалена, False если задача не была найдена
+         """
+        for i, task in enumerate(self._tasks):
+            if task.name == task_name:
+                self._tasks.pop(i)
+                self.recalculate_scheduler()
+                return True
+        return False
+
+    def recalculate_scheduler(self) -> None:
+        """Пересчитывает расписание на основе текущего списка задач."""
+        sorted_tasks = self.__sort_tasks(self._tasks)
+        self._executor_schedule = [[], []]
+        self.__fill_schedule(sorted_tasks)
+
     @property
     def duration(self) -> float:
         """Возвращает общую продолжительность расписания."""
         return self._executor_schedule[0][-1].end
+
+    def __validate_task(self, task: StagedTask) -> None:
+        """Валадирует задачу, а также проверяет что она подходит для конвейерного расписания"""
+        if not isinstance(task, StagedTask):
+            raise ScheduleArgumentError("Задача должна быть экземпляром StagedTask")
+        if task.stage_count != 2:
+            raise ScheduleArgumentError("Задача должна иметь ровно 2 этапа для конвейерного расписания")
 
     def __fill_schedule(self, tasks: list[StagedTask]) -> None:
         """Процедура составляет расписание из элементов ScheduleItem для каждого
@@ -115,14 +146,12 @@ class ConveyorSchedule(AbstractSchedule):
                     ErrorTemplates.INVALID_STAGE_CNT.format(idx)
                 )
 
-
-if __name__ == "__main__":
+def main():
     print("Пример использования класса ConveyorSchedule")
 
     # Инициализируем входные данные для составления расписания
     tasks = [
         StagedTask("a", [7, 2]),
-        StagedTask("b", [3, 4]),
         StagedTask("c", [2, 5]),
         StagedTask("d", [4, 1]),
         StagedTask("e", [6, 6]),
@@ -135,8 +164,19 @@ if __name__ == "__main__":
     schedule = ConveyorSchedule(tasks)
     # Выведем в консоль полученное расписание
     print(schedule)
+    # Вначале удалим задачу:
+    task_b = schedule.remove_task("b")
+    # Добавим эту же задачу
+    schedule.add_task(StagedTask("b", [3, 4]))
+    # Добавим некорректную задачу:
+    # schedule.add_task(StagedTask("invalid", [1, 2, 3])) - ошибка
+    # Выведем в консоль полученное расписание
+    print(schedule)
     for i in range(schedule.executor_count):
         print(f"\nРасписание для исполнителя # {i + 1}:")
         for schedule_item in schedule.get_schedule_for_executor(i):
             print(schedule_item)
     print(schedule.duration)
+
+if __name__ == "__main__":
+    main()
