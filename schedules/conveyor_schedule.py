@@ -56,7 +56,30 @@ class ConveyorSchedule(AbstractSchedule):
     def __fill_schedule(self, tasks: list[StagedTask]) -> None:
         """Процедура составляет расписание из элементов ScheduleItem для каждого
         исполнителя, согласно алгоритму Джонсона."""
-        pass
+        self._executor_schedule = [[], []]
+        end_exec1, end_exec2 = 0, 0
+
+        for task in tasks:
+            duration1 = task.stage_duration(0)
+            item1 = ScheduleItem(task, end_exec1, duration1)
+            self._executor_schedule[0].append(item1)
+
+            start_exec2 = max(item1.end, end_exec2)
+
+            if start_exec2 > end_exec2:
+                self._executor_schedule[1].append(ScheduleItem(None, end_exec2, start_exec2 - end_exec2))
+
+            duration2 = task.stage_duration(1)
+            item2 = ScheduleItem(task, start_exec2, duration2)
+            self._executor_schedule[1].append(item2)
+
+            end_exec1 = item1.end
+            end_exec2 = item2.end
+
+        if end_exec1 < end_exec2:
+            self._executor_schedule[0].append(ScheduleItem(None, end_exec1, end_exec2 - end_exec1))
+        elif end_exec2 < end_exec1:
+            self._executor_schedule[1].append(ScheduleItem(None, end_exec2, end_exec1 - end_exec2))
 
     @staticmethod
     def __sort_tasks(tasks: list[StagedTask]) -> list[StagedTask]:
@@ -110,10 +133,10 @@ if __name__ == "__main__":
     # Инициализируем экземпляр класса Schedule
     # при этом будет рассчитано расписание для каждого исполнителя
     schedule = ConveyorSchedule(tasks)
-
     # Выведем в консоль полученное расписание
     print(schedule)
     for i in range(schedule.executor_count):
         print(f"\nРасписание для исполнителя # {i + 1}:")
         for schedule_item in schedule.get_schedule_for_executor(i):
             print(schedule_item)
+    print(schedule.duration)
