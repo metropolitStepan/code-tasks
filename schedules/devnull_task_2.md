@@ -29,9 +29,7 @@ class AbstractSchedule {
   get_schedule_for_executor()
 }
 
-class ConveyorSchedule {
-  duration
-}
+class ConveyorSchedule
 
 AbstractSchedule --> Task : работает с
 AbstractSchedule --> ScheduleItem : содержит
