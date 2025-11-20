@@ -51,13 +51,8 @@ class ConveyorSchedule(AbstractSchedule):
     @property
     def duration(self) -> float:
         """Возвращает общую продолжительность расписания."""
-        if not self._executor_schedule[0]:
-            return 0.0
-
-        value = self._executor_schedule[0][-1].end
-        if isinstance(value, float) and value.is_integer():
-            return int(value)
-        return value
+        return self._executor_schedule[0][-1].end
+        
 
     def __fill_schedule(self, tasks: list[StagedTask]) -> None:
         """Процедура составляет расписание из элементов ScheduleItem для каждого

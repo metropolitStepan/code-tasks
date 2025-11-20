@@ -50,9 +50,15 @@ class AbstractSchedule(ABC):
         ]
 
     def __str__(self):
+        duration = self.duration
+        if isinstance(duration, float) and duration.is_integer():
+            duration = int(duration)
+            
         return SCHEDULE_STR_TEMPL.format(
-            self.duration, self.task_count, self.executor_count
-        )
+            duration,             
+            self.task_count,
+            self.executor_count,
+    )
 
     @property
     def tasks(self) -> tuple[Task]:
