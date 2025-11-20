@@ -54,13 +54,88 @@ class Schedule(AbstractSchedule):
 
     def __calculate_duration(self) -> float:
         """Вычисляет и возвращает минимальную продолжительность расписания"""
-        pass
+        max_duration = max(task.duration for task in self._tasks)
+        total_duration = sum(task.duration for task in self._tasks)
+        avg_duration = total_duration / self.executor_count
+
+        return float(max(max_duration, avg_duration))
 
     def __fill_schedule_for_each_executor(self) -> None:
         """Процедура составляет расписание из элементов ScheduleItem для каждого
         исполнителя, на основе исходного списка задач и общей продолжительности
         расписания."""
-        pass
+
+        current_time = 0.0
+        task_idx = 0
+        executor_idx = 0
+
+        while task_idx < len(self._tasks):
+            task = self._tasks[task_idx]
+            remaining_duration = task.duration
+
+            while remaining_duration > 0 and executor_idx < self.executor_count:
+                available_time = self._duration - current_time
+
+                if available_time > 0:
+                    time_to_assign = min(remaining_duration, available_time)
+
+                    schedule_item = ScheduleItem(
+                        task=task,
+                        start=current_time,
+                        duration=time_to_assign
+                    )
+                    self._executor_schedule[executor_idx].append(schedule_item)
+
+                    remaining_duration -= time_to_assign
+                    current_time += time_to_assign
+
+                    if current_time >= self._duration:
+                        executor_idx += 1
+                        current_time = 0.0
+                else:
+                    executor_idx += 1
+                    current_time = 0.0
+
+            task_idx += 1
+
+        for idx in range(self.executor_count):
+            executor_schedule = self._executor_schedule[idx]
+            total_work_time = sum(item.duration for item in executor_schedule if not item.is_downtime)
+
+            if total_work_time < self._duration:
+                if executor_schedule:
+                    last_end_time = executor_schedule[-1].end
+                else:
+                    last_end_time = 0.0
+
+                downtime_item = ScheduleItem(
+                    task=None,
+                    start=last_end_time,
+                    duration=self._duration - last_end_time
+                )
+                self._executor_schedule[idx].append(downtime_item)
+
+    def get_executor_downtime(self, executor_idx: int) -> float:
+        total_downtime = 0.0
+        for item in self._executor_schedule[executor_idx]:
+            if item.is_downtime:
+                total_downtime += item.duration
+        return total_downtime
+
+    def get_total_downtime(self) -> float:
+        total_downtime = 0.0
+        for executor_idx in range(self.executor_count):
+            total_downtime += self.get_executor_downtime(executor_idx)
+        return total_downtime
+
+    def print_downtime_info(self) -> None:
+        print("\nИнформация о времени простоя:")
+        for executor_idx in range(self.executor_count):
+            downtime = self.get_executor_downtime(executor_idx)
+            print(f"Исполнитель #{executor_idx + 1}: время простоя = {downtime}")
+
+        total_downtime = self.get_total_downtime()
+        print(f"Общее время простоя всех исполнителей: {total_downtime}")
 
 
 if __name__ == "__main__":
@@ -89,3 +164,6 @@ if __name__ == "__main__":
         print(f"\nРасписание для исполнителя # {i + 1}:")
         for schedule_item in schedule.get_schedule_for_executor(i):
             print(schedule_item)
+
+    # Информация о времени простоя
+    schedule.print_downtime_info()
