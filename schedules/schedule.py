@@ -54,13 +54,63 @@ class Schedule(AbstractSchedule):
 
     def __calculate_duration(self) -> float:
         """Вычисляет и возвращает минимальную продолжительность расписания"""
-        pass
+        longest_task = max(t.duration for t in self._tasks)
+        sum_of_tasks = sum(t.duration for t in self._tasks)
+        mean_duration = sum_of_tasks / self.executor_count
+
+        return float(max(longest_task, mean_duration))
 
     def __fill_schedule_for_each_executor(self) -> None:
         """Процедура составляет расписание из элементов ScheduleItem для каждого
         исполнителя, на основе исходного списка задач и общей продолжительности
         расписания."""
-        pass
+        
+        current_executor = 0
+        executor_time = 0.0
+
+        for task in self._tasks:
+            task_remaining = task.duration
+
+            while task_remaining > 0:
+                time_left = self._duration - executor_time
+
+                if time_left <= 0:
+                    current_executor += 1
+                    executor_time = 0.0
+                    time_left = self._duration
+
+                allocated_time = min(task_remaining, time_left)
+
+                item = ScheduleItem(
+                    task=task,
+                    start=executor_time,
+                    duration=allocated_time
+                )
+                self._executor_schedule[current_executor].append(item)
+
+                task_remaining -= allocated_time
+                executor_time += allocated_time
+
+        self.__add_downtime_to_executors()
+
+    def __add_downtime_to_executors(self) -> None:
+        """Добавляет время простоя для всех исполнителей."""
+        for executor_num in range(self.executor_count):
+            schedule = self._executor_schedule[executor_num]
+
+            if schedule:
+                final_time = schedule[-1].end
+            else:
+                final_time = 0.0
+
+            downtime = self._duration - final_time
+            if downtime > 0:
+                idle_item = ScheduleItem(
+                    task=None,
+                    start=final_time,
+                    duration=downtime
+                )
+                self._executor_schedule[executor_num].append(idle_item)
 
 
 if __name__ == "__main__":
