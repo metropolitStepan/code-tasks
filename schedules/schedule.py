@@ -33,18 +33,13 @@ class Schedule(AbstractSchedule):
 
         :param tasks: Список задач для составления расписания.
         :param executor_count: Количество исполнителей.
-        :raise ScheduleArgumentError: Если список задач предоставлен в
-        некорректном формате или количество исполнителей не является целым
-        положительным числом.
         """
         super().__init__(tasks, executor_count)
 
-        # Рассчитывается и сохраняется в приватном поле класса минимальная
-        # продолжительность расписания
+        # Рассчитывается и сохраняется минимальная продолжительность расписания
         self._duration = self.__calculate_duration()
 
-        # Процедура заполняет пустую заготовку расписания для каждого
-        # исполнителя объектами ScheduleItem.
+        # Формируется расписание для каждого исполнителя
         self.__fill_schedule_for_each_executor()
 
     @property
@@ -53,20 +48,77 @@ class Schedule(AbstractSchedule):
         return self._duration
 
     def __calculate_duration(self) -> float:
-        """Вычисляет и возвращает минимальную продолжительность расписания"""
-        pass
+        """Вычисляет и возвращает минимальную продолжительность расписания."""
+        longest = 0
+        total = 0
+
+        for task in self._tasks:
+            if task.duration > longest:
+                longest = task.duration
+            total += task.duration
+
+        average = total / self.executor_count
+        return float(longest if longest > average else average)
 
     def __fill_schedule_for_each_executor(self) -> None:
         """Процедура составляет расписание из элементов ScheduleItem для каждого
         исполнителя, на основе исходного списка задач и общей продолжительности
-        расписания."""
-        pass
+        расписания.
+        """
+        worker = 0
+        offset = 0.0
+        idx = 0
+
+        while idx < len(self._tasks):
+            task = self._tasks[idx]
+            remaining = task.duration
+
+            while remaining > 0 and worker < self.executor_count:
+                free_time = self._duration - offset
+
+                if free_time <= 0:
+                    worker += 1
+                    offset = 0.0
+                    continue
+
+                chunk = remaining if remaining < free_time else free_time
+
+                self._executor_schedule[worker].append(
+                    ScheduleItem(task=task, start=offset, duration=chunk)
+                )
+
+                offset += chunk
+                remaining -= chunk
+
+                if offset >= self._duration:
+                    worker += 1
+                    offset = 0.0
+
+            idx += 1
+
+        # Добавление пустых интервалов до полной длительности
+        for w in range(self.executor_count):
+            rows = self._executor_schedule[w]
+            end_value = rows[-1].end if rows else 0.0
+
+            if end_value < self._duration:
+                rows.append(
+                    ScheduleItem(task=None, start=end_value, duration=self._duration - end_value)
+                )
+    def update_tasks(self, new_tasks: list[Task]) -> None:
+        """Обновляет список задач и выполняет перерасчёт расписания."""
+        self._tasks = tuple(new_tasks)
+        self._duration = self.__calculate_duration()
+
+        for i in range(self.executor_count):
+            self._executor_schedule[i].clear()
+
+        self.__fill_schedule_for_each_executor()
 
 
 if __name__ == "__main__":
     print("Пример использования класса Schedule")
 
-    # Инициализируем входные данные для составления расписания
     tasks = [
         Task("a", 3),
         Task("b", 4),
@@ -79,11 +131,8 @@ if __name__ == "__main__":
         Task("i", 17),
     ]
 
-    # Инициализируем экземпляр класса Schedule
-    # при этом будет рассчитано расписание для каждого исполнителя
     schedule = Schedule(tasks, 5)
 
-    # Выведем в консоль полученное расписание
     print(schedule)
     for i in range(schedule.executor_count):
         print(f"\nРасписание для исполнителя # {i + 1}:")
