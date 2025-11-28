@@ -71,8 +71,8 @@ class ConveyorSchedule(AbstractSchedule):
         exec1 = self._executor_schedule[0]
         exec2 = self._executor_schedule[1]
 
-        finish1 = 0.0
-        finish2 = 0.0
+        finish1 = 0
+        finish2 = 0
 
         for task in tasks:
             first_duration = task.stage_duration(0)
