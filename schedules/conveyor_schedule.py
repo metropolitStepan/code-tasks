@@ -48,6 +48,18 @@ class ConveyorSchedule(AbstractSchedule):
         # исполнителя объектами ScheduleItem.
         self.__fill_schedule(ConveyorSchedule.__sort_tasks(tasks))
 
+    def reset_tasks(self, tasks: list[StagedTask]) -> None:
+        """Изменяет состав задач расписания и полностью пересчитывает его"""
+        ConveyorSchedule.__validate_params(tasks)
+        self._tasks = tasks
+        self.__rebuild_schedule()
+
+    def __rebuild_schedule(self) -> None:
+        """Переинициализирует внутреннее расписание на основе текущих задач"""
+        self._executor_schedule = [[] for _ in range(self.executor_count)]
+        sorted_tasks = ConveyorSchedule.__sort_tasks(self._tasks)
+        self.__fill_schedule(sorted_tasks)
+
     @property
     def duration(self) -> float:
         """Возвращает общую продолжительность расписания."""
@@ -56,13 +68,59 @@ class ConveyorSchedule(AbstractSchedule):
     def __fill_schedule(self, tasks: list[StagedTask]) -> None:
         """Процедура составляет расписание из элементов ScheduleItem для каждого
         исполнителя, согласно алгоритму Джонсона."""
-        pass
+        exec1 = self._executor_schedule[0]
+        exec2 = self._executor_schedule[1]
+
+        finish1 = 0.0
+        finish2 = 0.0
+
+        for task in tasks:
+            first_duration = task.stage_duration(0)
+            second_duration = task.stage_duration(1)
+            # первый исполнитель без дыр
+            start1 = finish1
+            exec1.append(ScheduleItem(task, start1, first_duration))
+            finish1 = start1 + first_duration
+            ready_time = finish1
+
+            # 2 исполнитель, только после окончания 1 и закончил прошлую задачу
+            if ready_time >= finish2:
+                start2 = ready_time
+            else:
+                start2 = finish2
+
+            # простой 2
+            idle_time = start2 - finish2
+            if idle_time > 0:
+                exec2.append(ScheduleItem(None, finish2, idle_time))
+
+            exec2.append(ScheduleItem(task, start2, second_duration))
+            finish2 = start2 + second_duration
+
+        total_time = finish2
+
+        if finish1 < total_time:
+            exec1.append(ScheduleItem(None, finish1, total_time - finish1))
 
     @staticmethod
     def __sort_tasks(tasks: list[StagedTask]) -> list[StagedTask]:
         """Возвращает отсортированный список задач для применения
         алгоритма Джонсона."""
-        pass
+        first_tasks: list[StagedTask] = []
+        last_tasks: list[StagedTask] = []
+
+        for job in tasks:
+            a_i = job.stage_duration(0)
+            b_i = job.stage_duration(1)
+            if a_i <= b_i:
+                first_tasks.append(job)
+            else:
+                last_tasks.append(job)
+
+        first_tasks.sort(key=lambda work: work.stage_duration(0))
+        last_tasks.sort(key=lambda work: work.stage_duration(1), reverse=True)
+
+        return first_tasks + last_tasks
 
     @staticmethod
     def __validate_params(tasks: list[StagedTask]) -> None:
